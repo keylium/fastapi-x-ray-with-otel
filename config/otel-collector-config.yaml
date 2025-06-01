@@ -19,7 +19,7 @@ exporters:
     local_mode: false
     region: ${AWS_REGION}
   
-  awscloudwatchmetrics:
+  awsemf:
     region: ${AWS_REGION}
     namespace: FastAPI/OpenTelemetry
     dimension_rollup_option: NoDimensionRollup
@@ -27,17 +27,20 @@ exporters:
       - dimensions: [[service.name], [service.name, service.version]]
         metric_name_selectors:
           - ".*"
+  
+  debug:
+    verbosity: detailed
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch/traces]
-      exporters: [awsxray]
+      exporters: [awsxray, debug]
     
     metrics:
       receivers: [otlp]
       processors: [batch/metrics]
-      exporters: [awscloudwatchmetrics]
+      exporters: [awsemf]
 
   extensions: []
