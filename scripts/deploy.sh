@@ -22,19 +22,7 @@ AWS_REGION=$(aws configure get region || echo "ap-northeast-1")
 echo -e "${GREEN}AWS Account ID: ${AWS_ACCOUNT_ID}${NC}"
 echo -e "${GREEN}AWS Region: ${AWS_REGION}${NC}"
 
-echo -e "${YELLOW}Building and pushing Docker image...${NC}"
-
-aws ecr describe-repositories --repository-names fastapi-xray-demo --region $AWS_REGION > /dev/null 2>&1 || \
-aws ecr create-repository --repository-name fastapi-xray-demo --region $AWS_REGION
-
-aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-
-docker build -f docker/Dockerfile -t fastapi-xray-demo .
-docker tag fastapi-xray-demo:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/fastapi-xray-demo:latest
-
-docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/fastapi-xray-demo:latest
-
-echo -e "${GREEN}Docker image pushed successfully${NC}"
+echo -e "${YELLOW}Preparing for deployment...${NC}"
 
 echo -e "${YELLOW}Deploying infrastructure with Terraform...${NC}"
 
@@ -44,7 +32,6 @@ terraform init
 
 cat > terraform.tfvars << EOF
 aws_region = "$AWS_REGION"
-container_image = "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/fastapi-xray-demo:latest"
 EOF
 
 terraform plan
@@ -52,6 +39,24 @@ echo -e "${YELLOW}Do you want to apply these changes? (y/N)${NC}"
 read -r response
 if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
     terraform apply -auto-approve
+    
+    echo -e "${YELLOW}Building and pushing FastAPI Docker image to ECR...${NC}"
+    ECR_REPO=$(terraform output -raw fastapi_ecr_repository_url)
+    
+    echo -e "${YELLOW}Logging into ECR...${NC}"
+    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
+    
+    echo -e "${YELLOW}Building Docker image...${NC}"
+    cd ..
+    docker build -f docker/Dockerfile -t $ECR_REPO:latest .
+    
+    echo -e "${YELLOW}Pushing Docker image...${NC}"
+    docker push $ECR_REPO:latest
+    
+    echo -e "${YELLOW}Forcing ECS service update...${NC}"
+    cd terraform
+    PROJECT_NAME=$(terraform output -raw project_name || echo "fastapi-xray-otel")
+    aws ecs update-service --cluster $PROJECT_NAME --service $PROJECT_NAME --force-new-deployment --region $AWS_REGION
     
     ALB_HOSTNAME=$(terraform output -raw alb_hostname)
     echo -e "${GREEN}Deployment completed successfully!${NC}"

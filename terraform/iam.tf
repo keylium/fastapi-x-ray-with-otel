@@ -26,6 +26,36 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_role" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+data "aws_iam_policy_document" "ssm_parameter_policy" {
+  version = "2012-10-17"
+  
+  statement {
+    effect = "Allow"
+    actions = [
+      "ssm:GetParameter",
+      "ssm:GetParameters"
+    ]
+    resources = [
+      "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/*"
+    ]
+  }
+}
+
+resource "aws_iam_policy" "ssm_parameter_policy" {
+  name        = "${var.project_name}-ssm-parameter-policy"
+  description = "IAM policy for SSM Parameter Store access"
+  policy      = data.aws_iam_policy_document.ssm_parameter_policy.json
+
+  tags = {
+    Name = "${var.project_name}-ssm-parameter-policy"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_ssm_policy" {
+  role       = aws_iam_role.ecs_task_execution_role.name
+  policy_arn = aws_iam_policy.ssm_parameter_policy.arn
+}
+
 data "aws_iam_policy_document" "ecs_task_role" {
   version = "2012-10-17"
   statement {

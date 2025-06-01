@@ -12,6 +12,19 @@ resource "aws_lb" "main" {
   }
 }
 
+resource "aws_ecr_repository" "fastapi_app" {
+  name                 = "${var.project_name}-fastapi-app"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Name = "${var.project_name}-fastapi-app"
+  }
+}
+
 resource "aws_lb_target_group" "app" {
   name        = var.project_name
   port        = 8000

@@ -53,7 +53,7 @@ resource "aws_ecs_task_definition" "app" {
   container_definitions = jsonencode([
     {
       name  = "fastapi-app"
-      image = var.container_image
+      image = "${aws_ecr_repository.fastapi_app.repository_url}:latest"
       
       essential = true
       
@@ -142,7 +142,12 @@ resource "aws_ecs_task_definition" "app" {
         }
       ]
 
-      command = ["--config=/etc/otel-agent-config.yaml"]
+      secrets = [
+        {
+          name      = "AOT_CONFIG_CONTENT"
+          valueFrom = aws_ssm_parameter.otel_collector_config.arn
+        }
+      ]
 
       logConfiguration = {
         logDriver = "awslogs"

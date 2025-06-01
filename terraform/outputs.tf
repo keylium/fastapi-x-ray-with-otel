@@ -3,6 +3,16 @@ output "alb_hostname" {
   value       = aws_lb.main.dns_name
 }
 
+output "fastapi_ecr_repository_url" {
+  description = "URL of the FastAPI ECR repository"
+  value       = aws_ecr_repository.fastapi_app.repository_url
+}
+
+output "project_name" {
+  description = "Project name"
+  value       = var.project_name
+}
+
 output "vpc_id" {
   description = "ID of the VPC"
   value       = aws_vpc.main.id
