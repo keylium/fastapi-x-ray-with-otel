@@ -16,24 +16,30 @@ ECSタスクが以下のサービスにアクセスできる必要がありま�
 
 ## ローカル開発
 
-### 1. 依存関係のインストール
+### 1. uvのインストール（未インストールの場合）
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.cargo/env
+```
+
+### 2. 依存関係のインストール
 ```bash
 cd app
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
-### 2. OpenTelemetryの自動計装セットアップ
+### 3. OpenTelemetryの自動計装セットアップ
 ```bash
-opentelemetry-bootstrap -a install
+uv run opentelemetry-bootstrap -a install
 ```
 
-### 3. アプリケーションの起動
+### 4. アプリケーションの起動
 ```bash
 # OpenTelemetryの自動計装付きで起動
-opentelemetry-instrument uvicorn main:app --host 0.0.0.0 --port 8000
+uv run opentelemetry-instrument uvicorn main:app --host 0.0.0.0 --port 8000
 
 # または通常起動（トレースなし）
-uvicorn main:app --host 0.0.0.0 --port 8000
+uv run uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 ### 4. Docker Composeでの起動
