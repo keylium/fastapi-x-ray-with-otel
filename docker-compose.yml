@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  fastapi-app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - OTEL_SERVICE_NAME=fastapi-xray-demo
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://adot-collector:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=fastapi-xray-demo,service.version=1.0.0
+      - AWS_REGION=ap-northeast-1
+    depends_on:
+      - adot-collector
+    networks:
+      - otel-network
+
+  adot-collector:
+    image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+    command: ["--config=/etc/otel-agent-config.yaml"]
+    volumes:
+      - ./config/otel-collector-config.yaml:/etc/otel-agent-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+    environment:
+      - AWS_REGION=ap-northeast-1
+      # AWS credentials will be passed from host environment
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+    networks:
+      - otel-network
+
+networks:
+  otel-network:
+    driver: bridge
