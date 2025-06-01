@@ -22,7 +22,7 @@ fi
 
 echo -e "${YELLOW}Starting services with docker-compose...${NC}"
 
-docker-compose up -d
+docker compose up -d
 
 echo -e "${YELLOW}Waiting for services to start...${NC}"
 sleep 10
@@ -70,8 +70,8 @@ echo -e "${YELLOW}Application is running at: http://localhost:8000${NC}"
 echo -e "${YELLOW}ADOT Collector is running on ports 4317 (gRPC) and 4318 (HTTP)${NC}"
 echo ""
 echo -e "${YELLOW}To view logs:${NC}"
-echo "  docker-compose logs fastapi-app"
-echo "  docker-compose logs adot-collector"
+echo "  docker compose logs fastapi-app"
+echo "  docker compose logs adot-collector"
 echo ""
 echo -e "${YELLOW}To stop services:${NC}"
-echo "  docker-compose down"
+echo "  docker compose down"
