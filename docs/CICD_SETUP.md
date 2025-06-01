@@ -63,6 +63,11 @@ aws iam attach-role-policy \
 aws iam attach-role-policy \
   --role-name GitHubActions-FastAPI-XRay-Role \
   --policy-arn arn:aws:iam::aws:policy/AmazonECS_FullAccess
+
+# SSM Parameter Store アクセス権限（ADOT Collector設定用）
+aws iam attach-role-policy \
+  --role-name GitHubActions-FastAPI-XRay-Role \
+  --policy-arn arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess
 ```
 
 ### 2. GitHubシークレットの設定
@@ -137,12 +142,43 @@ GitHub ActionsのログはGitHubリポジトリの「Actions」タブで確認�
 aws ecr create-repository --repository-name fastapi-xray-otel-fastapi-app --region ap-northeast-1
 ```
 
+## 必要なAWS権限の詳細
+
+GitHub Actions CI/CDパイプラインが正常に動作するために、以下のAWS権限が必要です：
+
+### ECR（Elastic Container Registry）権限
+- `ecr:GetAuthorizationToken` - ECRログイン用
+- `ecr:BatchCheckLayerAvailability` - イメージレイヤー確認用
+- `ecr:GetDownloadUrlForLayer` - イメージダウンロード用
+- `ecr:BatchGetImage` - イメージ取得用
+- `ecr:DescribeRepositories` - リポジトリ情報取得用
+- `ecr:CreateRepository` - リポジトリ作成用
+- `ecr:InitiateLayerUpload` - イメージアップロード開始用
+- `ecr:UploadLayerPart` - イメージレイヤーアップロード用
+- `ecr:CompleteLayerUpload` - イメージアップロード完了用
+- `ecr:PutImage` - イメージプッシュ用
+
+### ECS（Elastic Container Service）権限
+- `ecs:DescribeClusters` - クラスター状態確認用
+- `ecs:DescribeServices` - サービス状態確認用
+- `ecs:UpdateService` - サービス更新用（新しいイメージでのデプロイ）
+
+### SSM Parameter Store権限
+- `ssm:GetParameter` - ADOT Collector設定取得用
+- `ssm:GetParameters` - 複数パラメータ取得用
+
+### 推奨されるマネージドポリシー
+- `AmazonEC2ContainerRegistryPowerUser` - ECR操作用
+- `AmazonECS_FullAccess` - ECS操作用（本番環境では最小権限に調整推奨）
+- `AmazonSSMReadOnlyAccess` - SSMパラメータ読み取り用
+
 ## セキュリティ考慮事項
 
 - OIDC連携により、長期的なAWSアクセスキーの管理が不要
 - IAMロールの権限は最小限に設定
 - GitHubシークレットは暗号化されて保存
 - ブランチ保護ルールの設定を推奨
+- 本番環境では、ECS_FullAccessの代わりにより制限的なカスタムポリシーの使用を推奨
 
 ## CI/CDパイプラインの拡張
 
