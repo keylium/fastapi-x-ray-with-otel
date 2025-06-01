@@ -8,6 +8,11 @@ output "fastapi_ecr_repository_url" {
   value       = aws_ecr_repository.fastapi_app.repository_url
 }
 
+output "github_actions_role_arn" {
+  description = "ARN of the GitHub Actions IAM role"
+  value       = aws_iam_role.github_actions.arn
+}
+
 output "project_name" {
   description = "Project name"
   value       = var.project_name

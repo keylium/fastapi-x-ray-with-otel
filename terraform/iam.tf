@@ -126,3 +126,111 @@ resource "aws_iam_role_policy_attachment" "ecs_task_role_xray_policy" {
   role       = aws_iam_role.ecs_task_role.name
   policy_arn = aws_iam_policy.xray_policy.arn
 }
+
+resource "aws_iam_openid_connect_provider" "github_actions" {
+  url = "https://token.actions.githubusercontent.com"
+
+  client_id_list = [
+    "sts.amazonaws.com",
+  ]
+
+  thumbprint_list = [
+    "6938fd4d98bab03faadb97b34396831e3780aea1"
+  ]
+
+  tags = {
+    Name = "${var.project_name}-github-actions-oidc"
+  }
+}
+
+data "aws_iam_policy_document" "github_actions_assume_role" {
+  version = "2012-10-17"
+  
+  statement {
+    effect = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.github_actions.arn]
+    }
+    
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+    
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:keylium/fastapi-x-ray-with-otel:*"]
+    }
+  }
+}
+
+resource "aws_iam_role" "github_actions" {
+  name               = "${var.project_name}-github-actions-role"
+  assume_role_policy = data.aws_iam_policy_document.github_actions_assume_role.json
+
+  tags = {
+    Name = "${var.project_name}-github-actions-role"
+  }
+}
+
+data "aws_iam_policy_document" "github_actions_policy" {
+  version = "2012-10-17"
+  
+  statement {
+    effect = "Allow"
+    actions = [
+      "ecr:GetAuthorizationToken",
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:BatchGetImage",
+      "ecr:DescribeRepositories",
+      "ecr:CreateRepository",
+      "ecr:InitiateLayerUpload",
+      "ecr:UploadLayerPart",
+      "ecr:CompleteLayerUpload",
+      "ecr:PutImage"
+    ]
+    resources = ["*"]
+  }
+  
+  statement {
+    effect = "Allow"
+    actions = [
+      "ecs:DescribeClusters",
+      "ecs:DescribeServices",
+      "ecs:UpdateService"
+    ]
+    resources = ["*"]
+  }
+  
+  statement {
+    effect = "Allow"
+    actions = [
+      "ssm:GetParameter",
+      "ssm:GetParameters"
+    ]
+    resources = [
+      "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/*"
+    ]
+  }
+}
+
+resource "aws_iam_policy" "github_actions_policy" {
+  name        = "${var.project_name}-github-actions-policy"
+  description = "IAM policy for GitHub Actions CI/CD"
+  policy      = data.aws_iam_policy_document.github_actions_policy.json
+
+  tags = {
+    Name = "${var.project_name}-github-actions-policy"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_policy" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = aws_iam_policy.github_actions_policy.arn
+}
