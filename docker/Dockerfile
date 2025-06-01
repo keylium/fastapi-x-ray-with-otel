@@ -17,7 +17,7 @@ ENV PATH="/root/.local/bin:$PATH"
 COPY app/requirements.txt .
 RUN /root/.local/bin/uv pip install --system --no-cache -r requirements.txt
 
-RUN /root/.local/bin/uv run opentelemetry-bootstrap -a install
+RUN /root/.local/bin/uv run opentelemetry-bootstrap -a requirements | /root/.local/bin/uv pip install --system --requirement -
 
 COPY app/ .
 
