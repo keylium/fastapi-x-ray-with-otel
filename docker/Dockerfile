@@ -8,15 +8,16 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/* \
-    && curl -LsSf https://astral.sh/uv/install.sh | sh
+    && curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && /root/.cargo/bin/uv --version
 
 # Add uv to PATH
 ENV PATH="/root/.cargo/bin:$PATH"
 
 COPY app/requirements.txt .
-RUN uv pip install --system --no-cache -r requirements.txt
+RUN /root/.cargo/bin/uv pip install --system --no-cache -r requirements.txt
 
-RUN uv run opentelemetry-bootstrap -a install
+RUN /root/.cargo/bin/uv run opentelemetry-bootstrap -a install
 
 COPY app/ .
 
@@ -30,4 +31,4 @@ ENV OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 ENV OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 ENV OTEL_RESOURCE_ATTRIBUTES=service.name=fastapi-xray-demo,service.version=1.0.0
 
-CMD ["uv", "run", "opentelemetry-instrument", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/root/.cargo/bin/uv", "run", "opentelemetry-instrument", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
