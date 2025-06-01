@@ -22,7 +22,42 @@ aws iam create-open-id-connect-provider \
 
 ## ステップ2: 信頼ポリシーの作成
 
+まず、現在のAWSアカウントIDを取得します：
+
+```bash
+# 現在のAWSアカウントIDを取得
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+echo "AWS Account ID: $ACCOUNT_ID"
+```
+
 `trust-policy.json`ファイルを作成：
+
+```bash
+cat > trust-policy.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::$ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:keylium/fastapi-x-ray-with-otel:*"
+        }
+      }
+    }
+  ]
+}
+EOF
+```
+
+または、手動でファイルを作成する場合：
 
 ```json
 {
@@ -47,7 +82,7 @@ aws iam create-open-id-connect-provider \
 }
 ```
 
-**重要**: `YOUR_ACCOUNT_ID`を実際のAWSアカウントIDに置き換えてください。
+**重要**: 手動作成の場合は`YOUR_ACCOUNT_ID`を実際のAWSアカウントIDに置き換えてください。
 
 ## ステップ3: IAMロールの作成
 
@@ -143,6 +178,78 @@ aws iam create-role \
 ### ポリシーの作成とアタッチ
 
 ```bash
+# アカウントIDを取得（既に取得済みの場合はスキップ）
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# ECRポリシーファイルの作成
+cat > ecr-policy.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetAuthorizationToken"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "ecr:DescribeRepositories",
+        "ecr:CreateRepository",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutImage"
+      ],
+      "Resource": "arn:aws:ecr:ap-northeast-1:$ACCOUNT_ID:repository/fastapi-xray-otel-*"
+    }
+  ]
+}
+EOF
+
+# ECSポリシーファイルの作成
+cat > ecs-policy.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DescribeClusters",
+        "ecs:DescribeServices",
+        "ecs:UpdateService"
+      ],
+      "Resource": [
+        "arn:aws:ecs:ap-northeast-1:$ACCOUNT_ID:cluster/fastapi-xray-otel",
+        "arn:aws:ecs:ap-northeast-1:$ACCOUNT_ID:service/fastapi-xray-otel/fastapi-xray-otel"
+      ]
+    }
+  ]
+}
+EOF
+
+# SSMポリシーファイルの作成
+cat > ssm-policy.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:GetParameters"
+      ],
+      "Resource": "arn:aws:ssm:ap-northeast-1:$ACCOUNT_ID:parameter/fastapi-xray-otel/*"
+    }
+  ]
+}
+EOF
+
 # ECRポリシーの作成
 aws iam create-policy \
   --policy-name GitHubActions-FastAPI-XRay-ECR-Policy \
@@ -158,18 +265,18 @@ aws iam create-policy \
   --policy-name GitHubActions-FastAPI-XRay-SSM-Policy \
   --policy-document file://ssm-policy.json
 
-# ポリシーのアタッチ（YOUR_ACCOUNT_IDを実際のアカウントIDに置き換え）
+# ポリシーのアタッチ
 aws iam attach-role-policy \
   --role-name GitHubActions-FastAPI-XRay-Role \
-  --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/GitHubActions-FastAPI-XRay-ECR-Policy
+  --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/GitHubActions-FastAPI-XRay-ECR-Policy
 
 aws iam attach-role-policy \
   --role-name GitHubActions-FastAPI-XRay-Role \
-  --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/GitHubActions-FastAPI-XRay-ECS-Policy
+  --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/GitHubActions-FastAPI-XRay-ECS-Policy
 
 aws iam attach-role-policy \
   --role-name GitHubActions-FastAPI-XRay-Role \
-  --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/GitHubActions-FastAPI-XRay-SSM-Policy
+  --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/GitHubActions-FastAPI-XRay-SSM-Policy
 ```
 
 ## ステップ5: 簡易設定（マネージドポリシー使用）
@@ -242,12 +349,15 @@ aws sts get-caller-identity --query Account --output text
 ### デバッグコマンド
 
 ```bash
+# アカウントIDを取得
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
 # IAMロールの信頼関係確認
 aws iam get-role --role-name GitHubActions-FastAPI-XRay-Role --query 'Role.AssumeRolePolicyDocument'
 
 # ポリシーの詳細確認
-aws iam get-policy --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/GitHubActions-FastAPI-XRay-ECR-Policy
-aws iam get-policy-version --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/GitHubActions-FastAPI-XRay-ECR-Policy --version-id v1
+aws iam get-policy --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/GitHubActions-FastAPI-XRay-ECR-Policy
+aws iam get-policy-version --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/GitHubActions-FastAPI-XRay-ECR-Policy --version-id v1
 ```
 
 ## セキュリティのベストプラクティス

@@ -12,7 +12,14 @@ GitHub ActionsからAWSリソースにアクセスするため、OIDC（OpenID C
 
 #### IAMロールの作成手順
 
-1. **IAM Identity Providerの作成**
+1. **アカウントIDの取得**
+```bash
+# 現在のAWSアカウントIDを取得
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+echo "AWS Account ID: $ACCOUNT_ID"
+```
+
+2. **IAM Identity Providerの作成**
 ```bash
 aws iam create-open-id-connect-provider \
   --url https://token.actions.githubusercontent.com \
@@ -20,16 +27,16 @@ aws iam create-open-id-connect-provider \
   --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
 ```
 
-2. **信頼ポリシーの作成**
-`trust-policy.json`ファイルを作成：
-```json
+3. **信頼ポリシーファイルの作成**
+```bash
+cat > trust-policy.json << EOF
 {
   "Version": "2012-10-17",
   "Statement": [
     {
       "Effect": "Allow",
       "Principal": {
-        "Federated": "arn:aws:iam::YOUR_ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+        "Federated": "arn:aws:iam::$ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
       },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
@@ -43,16 +50,17 @@ aws iam create-open-id-connect-provider \
     }
   ]
 }
+EOF
 ```
 
-3. **IAMロールの作成**
+4. **IAMロールの作成**
 ```bash
 aws iam create-role \
   --role-name GitHubActions-FastAPI-XRay-Role \
   --assume-role-policy-document file://trust-policy.json
 ```
 
-4. **必要なポリシーのアタッチ**
+5. **必要なポリシーのアタッチ**
 ```bash
 # ECRアクセス権限
 aws iam attach-role-policy \
